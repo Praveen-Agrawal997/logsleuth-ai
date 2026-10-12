@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LogSleuth AI | Log Intelligence</title>
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <style>
+      body {
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: Arial, sans-serif;
+      }
+
+      .navbar {
+        background: #111c33;
+        border-bottom: 1px solid #263449;
+      }
+
+      .brand {
+        color: #38bdf8;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+
+      .panel {
+        background: #172338;
+        border: 1px solid #2b3b52;
+        border-radius: 14px;
+        padding: 24px;
+      }
+
+      .form-control {
+        background: #0b1220;
+        color: #e2e8f0;
+        border: 1px solid #334155;
+      }
+
+      .form-control:focus {
+        background: #0b1220;
+        color: #fff;
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.15);
+      }
+
+      textarea {
+        font-family: Consolas, monospace;
+        font-size: 14px !important;
+      }
+
+      .stat-card {
+        background: #172338;
+        border: 1px solid #2b3b52;
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .muted {
+        color: #94a3b8;
+      }
+
+      .result-item {
+        background: #0f172a;
+        border: 1px solid #2b3b52;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-dark py-3">
+      <div class="container">
+        <span class="navbar-brand brand">LogSleuth AI</span>
+        <span class="muted small">LOG INTELLIGENCE PLATFORM</span>
+      </div>
+    </nav>
+
+    <main class="container py-5">
+      <div class="mb-4">
+        <h1 class="fw-bold">Application Log Analyzer</h1>
+        <p class="muted">
+          Inspect logs, identify errors, and understand application health.
+        </p>
+      </div>
+
+      <div class="panel mb-4">
+        <h4 class="mb-3">Submit Logs</h4>
+        <a href="/sample-logs" class="btn btn-outline-info btn-sm mb-3">
+          Download Sample Logs
+        </a>
+
+        <form method="POST" enctype="multipart/form-data">
+          <label for="log_file" class="form-label">
+            Upload a log file (.log or .txt)
+          </label>
+
+          <input
+            type="file"
+            id="log_file"
+            name="log_file"
+            class="form-control mb-3"
+            accept=".log,.txt"
+          />
+
+          <div class="text-center muted mb-3">— OR PASTE LOGS BELOW —</div>
+
+          <label for="log_text" class="form-label">
+            Paste your application or server logs
+          </label>
+
+          <textarea
+            id="log_text"
+            name="log_text"
+            class="form-control"
+            rows="10"
+            placeholder="2026-10-12 10:00:01 ERROR Database connection failed"
+          >
+           {{ log_text or '' }}</textarea
+          >
+
+          <div
+            class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2"
+          >
+            <span class="muted small">Maximum file size: 2 MB</span>
+            <div class="d-flex gap-2 flex-wrap">
+    <button type="submit" class="btn btn-info fw-semibold px-4">
+        Analyze Logs
+    </button>
+
+    <a href="/" class="btn btn-outline-light px-4">
+        Clear Logs
+    </a>
+</div>
+          </div>
+        </form>
+
+        {% if error %}
+        <div class="alert alert-danger mt-3" role="alert">{{ error }}</div>
+        {% endif %}
+      </div>
+
+      {% if result %}
+      <div class="mb-3">
+        <h3 class="fw-bold">Analysis Overview</h3>
+        <p class="muted">Summary of the submitted log data.</p>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+          <div class="stat-card">
+            <p class="muted mb-2">Total Lines</p>
+            <h2>{{ result.total_lines }}</h2>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <div class="stat-card">
+            <p class="muted mb-2">Errors</p>
+            <h2 class="text-danger">
+              {{ result.severity_counts.get('ERROR', 0) }}
+            </h2>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <div class="stat-card">
+            <p class="muted mb-2">Warnings</p>
+            <h2 class="text-warning">
+              {{ result.severity_counts.get('WARNING', 0) }}
+            </h2>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <div class="stat-card">
+            <p class="muted mb-2">Critical / Fatal</p>
+            <h2 class="text-danger">
+              {{ result.severity_counts.get('CRITICAL', 0) +
+              result.severity_counts.get('FATAL', 0) }}
+            </h2>
+          </div>
+        </div>
+
+        <div class="panel mb-4">
+          <div
+            class="d-flex justify-content-between align-items-center flex-wrap gap-2"
+          >
+            <div>
+              <h4 class="mb-1">Log Health Score</h4>
+              <p class="muted mb-0">
+                Rule-based score calculated from errors and warnings.
+              </p>
+            </div>
+
+            <div class="text-end">
+              <h2 class="text-info mb-0">
+                {{ result.health_score }}<span class="muted">/100</span>
+              </h2>
+
+              <p class="mb-0 mt-2 fw-semibold">
+                Status: {{ result.health_status }}
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="progress mt-3"
+            role="progressbar"
+            aria-label="Log health score"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="{{ result.health_score }}"
+            style="height: 10px; background: #334155"
+          >
+            <div
+              class="progress-bar bg-info"
+              style="width: {{ result.health_score }}%;"
+            ></div>
+          </div>
+        </div>
+
+        <div class="panel mb-4">
+          <h4 class="mb-3">Log Severity Distribution</h4>
+          <div style="max-width: 600px; margin: auto">
+            <canvas id="severityChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-12">
+        <div class="stat-card">
+            <p class="muted mb-2">ML-Detected Anomalies</p>
+            <h2 class="text-info">
+                {{ result.logs | selectattr('is_anomaly') | list | length }}
+            </h2>
+            <p class="muted small mb-0">
+                Unusual log entries identified by Isolation Forest
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-8 col-12">
+        <div class="stat-card h-100">
+            <h5 class="text-info">AI/ML Anomaly Detection</h5>
+            <p class="muted mb-2">
+                LogSleuth AI uses TF-IDF text features and an
+                Isolation Forest model to flag unusual log entries.
+            </p>
+            <p class="small mb-0">
+                Anomaly scores are relative indicators, not probabilities
+                or confirmation of a security incident.
+            </p>
+        </div>
+    </div>
+</div>
+
+      <div class="panel">
+        <div class="panel mb-4">
+          <div
+            class="d-flex justify-content-between align-items-center flex-wrap gap-2"
+          >
+            <div>
+              <h4 class="mb-1">Incident Overview</h4>
+              <p class="muted mb-0">
+                Total number of unique incidents detected in your logs.
+              </p>
+            </div>
+
+            <div class="text-end">
+              <h2 class="text-info mb-0">{{ result.top_errors | length }}</h2>
+              <span class="muted small">Total Incidents</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel mb-4">
+    <h4 class="mb-3">Analysis Summary</h4>
+
+    {% set errors = result.severity_counts.get('ERROR', 0)
+       + result.severity_counts.get('CRITICAL', 0)
+       + result.severity_counts.get('FATAL', 0) %}
+
+    {% set warnings = result.severity_counts.get('WARNING', 0) %}
+
+    {% if errors > 0 %}
+        <p class="mb-2">
+            <span class="text-danger fw-bold">Attention required:</span>
+            {{ errors }} error-level log entries detected.
+        </p>
+    {% else %}
+        <p class="mb-2">
+            <span class="text-success fw-bold">No errors detected.</span>
+            No ERROR, CRITICAL, or FATAL entries were found.
+        </p>
+    {% endif %}
+
+    <p class="muted mb-0">
+        {{ warnings }} warning-level log entries detected across
+        {{ result.total_lines }} total log lines.
+    </p>
+</div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="stat-card">
+              <p class="muted mb-2">High-Risk Incidents</p>
+              <h2 class="text-danger">
+                {{ result.top_errors | selectattr('risk_level', 'equalto',
+                'HIGH') | list | length }}
+              </h2>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="stat-card">
+              <p class="muted mb-2">Medium-Risk Incidents</p>
+              <h2 class="text-warning">
+                {{ result.top_errors | selectattr('risk_level', 'equalto',
+                'MEDIUM') | list | length }}
+              </h2>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="stat-card">
+              <p class="muted mb-2">Low-Risk Incidents</p>
+              <h2 class="text-success">
+                {{ result.top_errors | selectattr('risk_level', 'equalto',
+                'LOW') | list | length }}
+              </h2>
+            </div>
+          </div>
+        </div>
+        <h4 class="mb-3">Detected Incidents</h4>
+        <div class="mb-3">
+    <label for="incidentRiskFilter" class="form-label">
+        Filter Incidents by Risk
+    </label>
+
+    <select id="incidentRiskFilter"
+            class="form-select"
+            style="max-width: 280px;">
+        <option value="ALL">All Risk Levels</option>
+        <option value="HIGH">High Risk</option>
+        <option value="MEDIUM">Medium Risk</option>
+        <option value="LOW">Low Risk</option>
+    </select>
+    <p id="incidentFilterSummary" class="muted small mt-2 mb-0"></p>
+</div>
+
+        {% if result.top_errors %} {% for incident in result.top_errors %}
+        <div class="result-item">
+          <div
+            class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"
+          >
+            <span class="text-info fw-bold"> {{ incident.incident_id }} </span>
+
+            {% if incident.risk_level == 'HIGH' %}
+            <span class="badge text-bg-danger">HIGH RISK</span>
+            {% elif incident.risk_level == 'MEDIUM' %}
+            <span class="badge text-bg-warning">MEDIUM RISK</span>
+            {% else %}
+            <span class="badge text-bg-success">LOW RISK</span>
+            {% endif %}
+            
+{% if incident.ml_anomaly_detected %}
+    <span class="badge text-bg-info">ML ANOMALY</span>
+{% endif %}
+
+          </div>
+
+          <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+    <p class="mb-0 text-break">{{ incident.message }}</p>
+
+    <button
+        type="button"
+        class="btn btn-sm btn-outline-info copy-message-btn"
+        data-message="{{ incident.message | e }}">
+        Copy Message
+    </button>
+</div>
+
+          <div class="d-flex justify-content-between flex-wrap gap-2">
+            <span class="muted small"> Severity: {{ incident.severity }} </span>
+            <span class="muted small"> Occurrences: {{ incident.count }} </span>
+          </div>
+        </div>
+          
+{% if incident.ml_anomaly_detected %}
+<div class="mt-2 small">
+    <span class="text-info fw-semibold">ML Anomaly Score:</span>
+    {{ incident.ml_anomaly_score }}/100
+    <span class="muted">
+        ({{ incident.ml_anomaly_count }} flagged occurrence(s))
+    </span>
+</div>
+{% endif %}
+
+
+        <details class="mt-3">
+    <summary class="text-info fw-semibold" style="cursor: pointer;">
+        View Root Cause & Suggested Action
+    </summary>
+
+    <div class="mt-3 p-3 rounded"
+         style="background: #111c33; border: 1px solid #334155;">
+
+        <h6 class="text-info">Possible Cause</h6>
+        <p class="small mb-3">{{ incident.possible_cause }}</p>
+
+        <h6 class="text-info">Suggested Investigation</h6>
+        <p class="small mb-0">{{ incident.suggested_action }}</p>
+
+    </div>
+</details>
+
+        {% endfor %} {% else %}
+        <p class="muted mb-0">No critical errors found in these logs.</p>
+        {% endif %}
+      </div>
+      {% endif %} {% if result.logs %}
+      <div class="panel mt-4">
+        <h4 class="mb-3">Log Event Timeline</h4>
+        <p class="muted small">
+          Events in the order they appeared in the submitted logs.
+        </p>
+
+        <div class="mb-3">
+          <label for="severityFilter" class="form-label">
+            Filter by Severity
+          </label>
+
+          <select
+            id="severityFilter"
+            class="form-select"
+            style="max-width: 280px"
+          >
+            <option value="ALL">All Severities</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+            <option value="FATAL">FATAL</option>
+            <option value="WARNING">WARNING</option>
+            <option value="INFO">INFO</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="UNKNOWN">UNKNOWN</option>
+          </select>
+
+          
+<label for="anomalyFilter" class="form-label mt-3">
+    Filter by ML Anomaly
+</label>
+
+<select id="anomalyFilter" class="form-select" style="max-width: 280px;">
+    <option value="ALL">All Log Entries</option>
+    <option value="ANOMALY">ML Anomalies Only</option>
+    <option value="NORMAL">Normal Entries Only</option>
+</select>
+
+
+          <p id="filterSummary" class="muted small mt-2 mb-0"></p>
+        </div>
+
+        <div class="mb-3">
+          <label for="logSearch" class="form-label">
+            Search Log Messages
+          </label>
+          <input
+            type="text"
+            id="logSearch"
+            class="form-control"
+            placeholder="Search for database, timeout, connection..."
+          />
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-dark table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Timestamp</th>
+                <th>Severity</th>
+                <th>ML Anomaly</th>
+                <th>Log Message</th>
+              </tr>
+            </thead>
+            <tbody id="logTimelineBody">
+              {% for log in result.logs %}
+              <tr
+    data-severity="{{ log.severity }}"
+    data-anomaly="{{ 'true' if log.is_anomaly else 'false' }}"
+>
+                <td>{{ log.line }}</td>
+                <td class="text-nowrap">{{ log.timestamp }}</td>
+                <td>
+                  {% if log.severity in ['ERROR', 'CRITICAL', 'FATAL'] %}
+                  <span class="badge text-bg-danger"> {{ log.severity }} </span>
+                  {% elif log.severity == 'WARNING' %}
+                  <span class="badge text-bg-warning"> WARNING </span>
+                  {% elif log.severity == 'INFO' %}
+                  <span class="badge text-bg-info"> INFO </span>
+                  {% else %}
+                  <span class="badge text-bg-secondary">
+                    {{ log.severity }}
+                  </span>
+                  {% endif %}
+                </td>
+                
+<td>
+    {% if log.is_anomaly %}
+        <span class="badge text-bg-info">ANOMALY</span>
+        <div class="muted small mt-1">
+            Score: {{ log.anomaly_score }}/100
+        </div>
+    {% elif log.ml_status == 'Normal' %}
+        <span class="badge text-bg-success">Normal</span>
+        <div class="muted small mt-1">
+            Score: {{ log.anomaly_score }}/100
+        </div>
+    {% else %}
+        <span class="badge text-bg-secondary">
+            {{ log.ml_status }}
+        </span>
+    {% endif %}
+</td>
+
+                <td class="text-break">{{ log.message }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <form
+            method="POST"
+            action="/export"
+            enctype="multipart/form-data"
+            class="mb-4"
+          >
+            <input type="hidden" name="log_text" value="{{ log_text or '' }}" />
+
+            <button type="submit" class="btn btn-outline-info">
+              Export JSON Report
+            </button>
+          </form>
+
+          <form method="POST" action="/export/csv" class="mb-4">
+            <input type="hidden" name="log_text" value="{{ log_text or '' }}" />
+
+            <button type="submit" class="btn btn-outline-light">
+              Export CSV Report
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      <footer class="text-center muted mt-5 small">
+        LogSleuth AI · Project Prototype
+      </footer>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    {% if result %}
+    <script>
+      const severityLabels = {{ result.severity_counts.keys() | list | tojson }};
+      const severityValues = {{ result.severity_counts.values() | list | tojson }};
+
+      new Chart(document.getElementById("severityChart"), {
+          type: "doughnut",
+          data: {
+              labels: severityLabels,
+              datasets: [{
+                  label: "Log Count",
+                  data: severityValues,
+                  backgroundColor: [
+                      "#ef4444",
+                      "#f59e0b",
+                      "#38bdf8",
+                      "#a78bfa",
+                      "#22c55e",
+                      "#64748b",
+                      "#ec4899"
+                  ],
+                  borderColor: "#172338",
+                  borderWidth: 3
+              }]
+          },
+          options: {
+              responsive: true,
+              plugins: {
+                  legend: {
+                      position: "bottom",
+                      labels: { color: "#e2e8f0" }
+                  }
+              }
+          }
+      });
+    </script>
+    {% endif %}
+
+    <script>
+      
+const severityFilter = document.getElementById("severityFilter");
+const anomalyFilter = document.getElementById("anomalyFilter");
+const logSearch = document.getElementById("logSearch");
+
+if (severityFilter && logSearch) {
+    const logRows = document.querySelectorAll("#logTimelineBody tr");
+    const filterSummary = document.getElementById("filterSummary");
+
+    function filterLogs() {
+        const selectedSeverity = severityFilter.value;
+        const selectedAnomaly = anomalyFilter
+            ? anomalyFilter.value
+            : "ALL";
+        const searchText = logSearch.value.trim().toLowerCase();
+
+        let visibleCount = 0;
+
+        logRows.forEach((row) => {
+            const rowSeverity = row.dataset.severity;
+            const rowText = row.textContent.toLowerCase();
+            const isAnomaly = row.dataset.anomaly === "true";
+
+            const matchesSeverity =
+                selectedSeverity === "ALL" ||
+                rowSeverity === selectedSeverity;
+
+            const matchesAnomaly =
+                selectedAnomaly === "ALL" ||
+                (selectedAnomaly === "ANOMALY" && isAnomaly) ||
+                (selectedAnomaly === "NORMAL" && !isAnomaly);
+
+            const matchesSearch = rowText.includes(searchText);
+
+            const showRow =
+                matchesSeverity && matchesAnomaly && matchesSearch;
+
+            row.style.display = showRow ? "" : "none";
+
+            if (showRow) {
+                visibleCount++;
+            }
+        });
+
+        filterSummary.textContent =
+            `Showing ${visibleCount} of ${logRows.length} log entries`;
+    }
+
+    severityFilter.addEventListener("change", filterLogs);
+    logSearch.addEventListener("input", filterLogs);
+
+    if (anomalyFilter) {
+        anomalyFilter.addEventListener("change", filterLogs);
+    }
+
+    filterLogs();
+}
+
+      document.querySelectorAll(".copy-message-btn").forEach(button => {
+    button.addEventListener("click", async () => {
+        const message = button.dataset.message;
+
+        try {
+            await navigator.clipboard.writeText(message);
+            button.textContent = "Copied!";
+        } catch (error) {
+            button.textContent = "Copy failed";
+        }
+
+        setTimeout(() => {
+            button.textContent = "Copy Message";
+        }, 2000);
+    });
+});
+const incidentRiskFilter = document.getElementById("incidentRiskFilter");
+
+if (incidentRiskFilter) {
+    const incidentCards = document.querySelectorAll(
+        "#incidentRiskFilter ~ .unused"
+    );
+
+    const allCards = document.querySelectorAll(".result-item");
+    const summary = document.getElementById("incidentFilterSummary");
+
+    function filterIncidents() {
+        const selectedRisk = incidentRiskFilter.value;
+        let visibleCount = 0;
+
+        allCards.forEach(card => {
+            const badges = card.querySelectorAll(".badge");
+            let riskText = "";
+
+            badges.forEach(badge => {
+                const text = badge.textContent.trim();
+
+                if (text.includes("HIGH RISK")) riskText = "HIGH";
+                else if (text.includes("MEDIUM RISK")) riskText = "MEDIUM";
+                else if (text.includes("LOW RISK")) riskText = "LOW";
+            });
+
+            const showCard =
+                selectedRisk === "ALL" || riskText === selectedRisk;
+
+            card.style.display = showCard ? "" : "none";
+
+            if (showCard) visibleCount++;
+        });
+
+        summary.textContent =
+            `Showing ${visibleCount} of ${allCards.length} incidents`;
+    }
+
+    incidentRiskFilter.addEventListener("change", filterIncidents);
+    filterIncidents();
+}
+    </script>
+  </body>
+</html>
